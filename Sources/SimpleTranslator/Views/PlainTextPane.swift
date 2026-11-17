@@ -5,6 +5,7 @@ struct PlainTextPane: NSViewRepresentable {
     @Binding var text: String
     var editable = true
     var fontSize: CGFloat = 17
+    var wordActions: WordActions?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
@@ -12,7 +13,7 @@ struct PlainTextPane: NSViewRepresentable {
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
         scroll.drawsBackground = false
-        let view = NSTextView(frame: .zero)
+        let view = editable ? NSTextView(frame: .zero) : TranslationTextView(frame: .zero)
         view.isEditable = editable
         view.isSelectable = true
         view.isRichText = false
@@ -48,6 +49,7 @@ struct PlainTextPane: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let view = scroll.documentView as? NSTextView else { return }
+        (view as? TranslationTextView)?.actions = wordActions
         view.font = .systemFont(ofSize: fontSize)
         view.textColor = .labelColor
         guard view.string != text, !view.hasMarkedText() else { return }

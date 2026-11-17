@@ -1,4 +1,5 @@
 import Testing
+import AppKit
 import Foundation
 @testable import SimpleTranslator
 
@@ -111,4 +112,92 @@ private actor ControlledTranslator: Translating {
     try await Task.sleep(for: .milliseconds(20))
     #expect(store.translatedText == "Второй.")
     #expect(store.isComplete)
+}
+
+@MainActor @Test func wordReplacementSurvivesAppendingAndCacheButStaleChoiceCannotApply() async throws {
+    let client = ControlledTranslator()
+    let (store, preferences) = setup(client)
+    store.sourceText = "Details, details."
+    store.schedule(preferences: preferences, immediately: true)
+    try await waitUntil { await client.count == 1 }
+    await client.finish("🔍 Детали, детали.", request: 0)
+    try await waitUntil { store.isComplete }
+    let id = store.requestID
+    let second = (store.translatedText as NSString).range(of: "детали")
+    let word = try #require(TranslationWord(text: store.translatedText, characterOffset: second.location + 1, language: "ru"))
+    store.replace(try #require(word.alternative(replacement: "нюансы")), id: id)
+    #expect(store.translatedText == "🔍 Детали, нюансы.")
+    store.sourceText += "\nMore."
+    store.schedule(preferences: preferences, immediately: true)
+    store.replace(try #require(word.alternative(replacement: "лишнее")), id: id)
+    try await waitUntil { await client.count == 2 }
+    await client.finish("\nЕщё.", request: 1)
+    try await waitUntil { store.isComplete }
+    #expect(store.translatedText == "🔍 Детали, нюансы.\nЕщё.")
+    store.sourceText = "Details, details."
+    store.schedule(preferences: preferences, immediately: true)
+    try await waitUntil { store.isComplete }
+    #expect(store.translatedText == "🔍 Детали, нюансы.")
+    #expect(await client.count == 2)
+}
+
+@Test func clickedWordLimitsContextAndFiltersModelOutput() throws {
+    let text = "Private paragraph.\n👩🏽‍💻 Café has good coffee.\nPrivate footer."
+    let location = (text as NSString).range(of: "good").location
+    let word = try #require(TranslationWord(text: text, characterOffset: location + 2, language: "en"))
+    #expect(word.before == "👩🏽‍💻 Café has ")
+    #expect(word.after == " coffee.")
+    #expect(TranslationWord(text: text, characterOffset: location - 1, language: "en") == nil)
+    #expect(TranslationWord(text: text, characterOffset: (text as NSString).range(of: "footer.").location + 6, language: "en") == nil)
+    let raw = ["GOOD", "decent", "Decent", " fine ", "multi\nline", "", "123"]
+    let response = try JSONEncoder().encode(raw.map { ["left": "", "right": "", "replacement": $0] })
+    #expect(try word.suggestions(from: String(decoding: response, as: UTF8.self)).map(\.replacement) == ["decent", "fine"])
+    #expect(throws: TranslationError.invalidResponse) { try word.suggestions(from: "[\"unfinished") }
+}
+
+@Test(arguments: [
+    ("I saw an apartment and an apartment.", "apartment", "an ", "", "a flat", "I saw an apartment and a flat."),
+    ("She found a flat.", "flat", "a ", "", "an apartment", "She found an apartment."),
+    ("Это тихое место рядом.", "место", "тихое ", "", "тихий уголок", "Это тихий уголок рядом."),
+    ("Une idée originale.", "idée", "Une ", " originale", "Un concept original", "Un concept original."),
+    ("J’aime l’école.", "école", "l’", "", "la classe", "J’aime la classe.")
+]) func agreementEditPreservesEverythingOutsideTheExactSpan(text: String, token: String, left: String, right: String,
+                                                            replacement: String, expected: String) throws {
+    let occurrence = (text as NSString).range(of: token, options: .backwards)
+    let word = try #require(TranslationWord(text: text, characterOffset: occurrence.location, language: Languages.detect(text) ?? "en"))
+    // The tokenizer may include an attached apostrophe and article in a single French token.
+    let actualLeft = word.word == left + token ? "" : left
+    let edit = try #require(word.alternative(left: actualLeft, right: right, replacement: replacement))
+    #expect((text as NSString).replacingCharacters(in: edit.range, with: edit.replacement) == expected)
+    #expect(word.alternative(left: "invented ", replacement: replacement) == nil)
+    #expect(word.alternative(right: "\n", replacement: replacement) == nil)
+}
+
+@Test func incompleteModelSpanCannotLeaveTwoArticlesOrAnInvalidArticle() throws {
+    let text = "I saw an apartment."
+    let word = try #require(TranslationWord(text: text, characterOffset: 10, language: "en"))
+    let response = #"[{"left":"","right":"","replacement":"a flat"},{"left":"","right":"","replacement":"flat"}]"#
+    let choices = try word.suggestions(from: response)
+    #expect(choices.count == 1)
+    let choice = try #require(choices.first)
+    #expect((text as NSString).replacingCharacters(in: choice.range, with: choice.replacement) == "I saw a flat.")
+}
+
+@MainActor @Test func textViewAnchorsSuggestionsToTheClickedOccurrence() throws {
+    let view = TranslationTextView(frame: NSRect(x: 0, y: 0, width: 340, height: 140))
+    view.font = NSFont.systemFont(ofSize: 17)
+    view.textContainerInset = NSSize(width: 22, height: 20)
+    view.string = "A place.\nA quiet place."
+    let layout = try #require(view.layoutManager)
+    let container = try #require(view.textContainer)
+    layout.ensureLayout(for: container)
+    let second = (view.string as NSString).range(of: "place", options: .backwards)
+    let glyphs = layout.glyphRange(forCharacterRange: second, actualCharacterRange: nil)
+    let rect = layout.boundingRect(forGlyphRange: glyphs, in: container)
+        .offsetBy(dx: view.textContainerOrigin.x, dy: view.textContainerOrigin.y)
+    let hit = try #require(view.word(at: NSPoint(x: rect.midX, y: rect.midY), language: "en"))
+    #expect(hit.word.range == second)
+    #expect(hit.rect == rect)
+    #expect(view.isFlipped)
+    #expect(view.word(at: NSPoint(x: rect.maxX + 80, y: rect.midY), language: "en") == nil)
 }

@@ -78,8 +78,17 @@ struct ContentView: View {
         }
     }
 
+    private var wordActions: WordActions? {
+        guard store.isComplete else { return nil }
+        let id = store.requestID
+        return WordActions(id: id, language: store.resolvedTarget,
+            load: { try await store.alternatives(for: $0, id: id, preferences: preferences) },
+            replace: { store.replace($0, id: id); copied = false },
+            selectProvider: { preferences.wordProvider = $0 })
+    }
+
     private func pane(text: Binding<String>, placeholder: String, editable: Bool) -> some View {
-        PlainTextPane(text: text, editable: editable, fontSize: fontSize)
+        PlainTextPane(text: text, editable: editable, fontSize: fontSize, wordActions: editable ? nil : wordActions)
             .overlay(alignment: .topLeading) {
                 if text.wrappedValue.isEmpty {
                     Text(placeholder).font(.system(size: fontSize)).foregroundStyle(.tertiary)

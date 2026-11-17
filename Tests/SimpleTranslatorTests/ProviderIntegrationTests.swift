@@ -131,3 +131,73 @@ private final class RecordedRequests: @unchecked Sendable {
     let result = try ProviderRequests.translatedText(Data(#"{"data":{"translations":[{"translatedText":"A &amp; B: &#x41; &quot;C&quot;"}]}}"#.utf8), provider: .googleCloud)
     #expect(result == "A & B: A \"C\"")
 }
+
+@Test(arguments: Provider.allCases.filter { !$0.isSpecialized }) func contextualAlternativesUseChosenAPI(_ provider: Provider) async throws {
+    let id = UUID().uuidString
+    FixtureProtocol.install(id) { request in
+        if request.url?.path == "/api/v2/oauth" {
+            return (200, "{\"access_token\":\"synthetic-access\",\"expires_at\":\(Int(Date().addingTimeInterval(1800).timeIntervalSince1970 * 1000))}")
+        }
+        var data = request.httpBody ?? Data()
+        if let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 2048)
+            while true {
+                let size = stream.read(&buffer, maxLength: buffer.count)
+                guard size >= 0 else { throw URLError(.cannotDecodeRawData) }
+                if size == 0 { break }
+                data.append(contentsOf: buffer.prefix(size))
+            }
+        }
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(body["stream"] as? Bool == false)
+        let messages = try #require(body["messages"] as? [[String: String]])
+        let context = try JSONDecoder().decode([String: String].self, from: Data((messages.last?["content"] ?? "").utf8))
+        #expect(context == ["before": "a ", "word": "quiet", "after": " place", "articleBefore": "a "])
+        if provider == .openAI { #expect(body["store"] as? Bool == false) }
+        if provider == .openRouter { #expect((body["provider"] as? [String: String])?["data_collection"] == "deny") }
+        let edits = [["left": "a ", "right": "", "replacement": "a peaceful"], ["left": "a ", "right": "", "replacement": "a calm"]]
+        let content = String(decoding: try JSONEncoder().encode(edits), as: UTF8.self)
+        let reply = ["choices": [["message": ["content": content], "finish_reason": "stop"]]]
+        return (200, String(decoding: try JSONSerialization.data(withJSONObject: reply), as: UTF8.self))
+    }
+    defer { FixtureProtocol.remove(id) }
+    let options = URLSessionConfiguration.ephemeral
+    options.protocolClasses = [FixtureProtocol.self]
+    options.httpAdditionalHeaders = ["X-Fixture-ID": id]
+    let session = URLSession(configuration: options)
+    defer { session.invalidateAndCancel() }
+    let config = TranslationConfiguration(provider: provider, model: provider == .huggingFace ? "sample/model:novita" : "sample",
+        key: "synthetic", source: "en", target: "en", options: ConnectionOptions(accountID: String(repeating: "a", count: 32)))
+    let word = try #require(TranslationWord(text: "a quiet place", characterOffset: 3, language: "en"))
+    let result = try await TranslationClient(session: session).alternatives(for: word, configuration: config)
+    #expect(result.map(\.replacement) == ["a peaceful", "a calm"])
+}
+
+@Test func incompleteOrFailedAlternativesNeverBecomeReplacements() async throws {
+    let options = URLSessionConfiguration.ephemeral
+    options.protocolClasses = [FixtureProtocol.self]
+    let id = UUID().uuidString
+    options.httpAdditionalHeaders = ["X-Fixture-ID": id]
+    let session = URLSession(configuration: options)
+    defer { session.invalidateAndCancel(); FixtureProtocol.remove(id) }
+    let client = TranslationClient(session: session)
+    let config = TranslationConfiguration(provider: .openAI, model: "sample", key: "synthetic", source: "en", target: "en")
+    let word = try #require(TranslationWord(text: "calm", characterOffset: 0, language: "en"))
+    FixtureProtocol.install(id) { _ in (200, #"{"choices":[{"finish_reason":"length","message":{"content":"[\"still\"]"}}]}"#) }
+    await #expect(throws: TranslationError.truncated) { try await client.alternatives(for: word, configuration: config) }
+    FixtureProtocol.install(id) { _ in (403, "synthetic private response") }
+    do {
+        _ = try await client.alternatives(for: word, configuration: config)
+        Issue.record("Expected a rejected request")
+    } catch {
+        #expect(error as? TranslationError == .server(403))
+        #expect(!TranslationError.message(for: error).contains("synthetic"))
+    }
+    let cancelled = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await client.alternatives(for: word, configuration: config)
+    }
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+}

@@ -13,7 +13,8 @@ import Observation
     var resolvedSource: String? { sourceLanguage == Languages.auto ? detectedLanguage : sourceLanguage }
     var resolvedTarget: String { Languages.target(selected: targetLanguage, source: resolvedSource) }
     @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var requestID = UUID()
+    private(set) var requestID = UUID()
+    private var isDemonstration = false
     @ObservationIgnored private var cache: [CacheKey: String] = [:]
     @ObservationIgnored private var cacheOrder: [CacheKey] = []
     @ObservationIgnored private let client: any Translating
@@ -42,6 +43,7 @@ import Observation
         let store = TranslatorStore(client: DemonstrationTranslator()) { _, source, target in
             TranslationConfiguration(provider: .deepL, model: "demo", key: "", source: source, target: target)
         }
+        store.isDemonstration = true
         store.sourceLanguage = "en"
         store.targetLanguage = "ru"
         store.detectedLanguage = "en"
@@ -119,6 +121,39 @@ import Observation
     private func receive(_ partial: String, id: UUID) {
         guard requestID == id else { return }
         translatedText = partial
+    }
+
+    func alternatives(for word: TranslationWord, id: UUID, preferences: Preferences) async throws -> [WordAlternative] {
+        guard isComplete, id == requestID else { throw CancellationError() }
+        if isDemonstration {
+            if word.word.lowercased() == "место" {
+                return ["Тихий уголок", "Уютное пространство"].compactMap {
+                    word.alternative(left: "Спокойное ", replacement: $0)
+                }
+            }
+            let examples = ["детали": ["подробности", "нюансы", "мелочи"], "маленькие": ["Небольшие", "Крошечные"],
+                            "спокойное": ["Тихое", "Уютное"]]
+            return (examples[word.word.lowercased()] ?? []).compactMap { word.alternative(replacement: $0) }
+        }
+        if let provider = preferences.wordProvider ?? (preferences.provider.isSpecialized ? nil : preferences.provider) {
+            let config = try preferences.configuration(for: provider, source: resolvedTarget, target: resolvedTarget)
+            return try await TranslationClient.shared.alternatives(for: word, configuration: config)
+        }
+        return try await LocalWordSuggestions.alternatives(for: word, language: resolvedTarget)
+    }
+
+    func replace(_ alternative: WordAlternative, id: UUID) {
+        guard isComplete, requestID == id, let range = Range(alternative.range, in: translatedText),
+              translatedText[range] == alternative.original else { return }
+        translatedText.replaceSubrange(range, with: alternative.replacement)
+        requestID = UUID()
+        if var snapshot = lastCompleted {
+            snapshot.translation = translatedText
+            lastCompleted = snapshot
+            let key = CacheKey(text: snapshot.source, provider: snapshot.provider, model: snapshot.model,
+                               source: snapshot.sourceLanguage, target: snapshot.targetLanguage, revision: snapshot.revision)
+            if cache[key] != nil { cache[key] = translatedText }
+        }
     }
 
     func swap() {

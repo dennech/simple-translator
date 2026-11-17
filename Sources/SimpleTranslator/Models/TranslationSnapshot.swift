@@ -2,7 +2,7 @@ import Foundation
 
 struct TranslationSnapshot {
     let source: String
-    let translation: String
+    var translation: String
     let provider: Provider
     let model: String
     let sourceLanguage: String

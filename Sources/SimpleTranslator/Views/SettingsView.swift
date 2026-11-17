@@ -109,6 +109,14 @@ struct SettingsView: View {
                 }
                 if let message { Text(message).font(.caption).textSelection(.enabled) }
             }
+            Section("Варианты слов") {
+                Picker("Подбирать через", selection: $preferences.wordProvider) {
+                    Text("Автоматически").tag(nil as Provider?)
+                    ForEach(Provider.allCases.filter { !$0.isSpecialized }) { Text($0.title).tag(Optional($0)) }
+                }
+                Text("В автоматическом режиме используется основная модель. Для DeepL и других специализированных переводчиков варианты подбирает Apple Intelligence, если язык доступен на этом Mac. При выборе другого сервиса слово и соседний текст отправляются его настроенной модели по тарифу аккаунта.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section {
                 HStack {
                     Text("Размер текста")
