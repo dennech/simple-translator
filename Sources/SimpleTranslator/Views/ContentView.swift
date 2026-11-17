@@ -14,6 +14,7 @@ struct ContentView: View {
     @AppStorage("fontSize") private var fontSize = 17.0
     @State private var copied = false
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
@@ -32,7 +33,9 @@ struct ContentView: View {
                 HStack {
                     LanguageButton(selection: $store.targetLanguage, detected: store.sourceText.isEmpty ? nil : store.resolvedTarget)
                     Spacer(minLength: 4)
-                    if store.isTranslating { ProgressView().controlSize(.small).scaleEffect(0.8).frame(width: 20) }
+                    TranslationActivity(active: store.isTranslating)
+                        .opacity(store.isTranslating ? 1 : 0)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: store.isTranslating)
                     iconButton(copied ? "checkmark" : "doc.on.doc", help: "Скопировать перевод (⌘⇧C)", action: copy)
                         .disabled(!store.isComplete)
                 }.frame(maxWidth: .infinity)
@@ -85,10 +88,8 @@ struct ContentView: View {
             }
             .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity)
             .background {
-                ZStack {
-                    Color(nsColor: .textBackgroundColor)
-                    if !editable { Color.blue.opacity(colorScheme == .dark ? 0.065 : 0.025) }
-                }
+                if editable { Color(nsColor: .textBackgroundColor) }
+                else { TranslationPaneBackground(working: store.isTranslating) }
             }
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(editable ? Color.primary.opacity(0.055) : Color.blue.opacity(0.12), lineWidth: 1))

@@ -15,6 +15,10 @@ protocol Translating: Sendable {
 final class TranslationClient: Translating, @unchecked Sendable {
     static let shared = TranslationClient()
     let session: URLSession
+    private let gigaChatToken = GigaChatToken()
+    func invalidateCredential(for provider: Provider) {
+        if provider == .gigaChat { gigaChatToken.invalidate() }
+    }
     init(session: URLSession? = nil) {
         if let session { self.session = session; return }
         let configuration = URLSessionConfiguration.ephemeral
@@ -27,18 +31,30 @@ final class TranslationClient: Translating, @unchecked Sendable {
 
     func translate(_ text: String, configuration: TranslationConfiguration,
                    onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
-        guard !configuration.key.isEmpty else { throw TranslationError.missingKey }
-        let chunks = TextChunker.split(text)
+        guard !configuration.provider.requiresKey || !configuration.key.isEmpty else { throw TranslationError.missingKey }
+        let effective: TranslationConfiguration
+        if [.myMemory, .amazon].contains(configuration.provider), configuration.source == Languages.auto {
+            effective = TranslationConfiguration(provider: configuration.provider, model: configuration.model, key: configuration.key,
+                source: try ProviderRequests.explicitSource(text, configuration: configuration), target: configuration.target, options: configuration.options)
+        } else { effective = configuration }
+        let chunks: [String]
+        if effective.provider == .myMemory { chunks = try TextChunker.splitUTF8(text, limit: 500, oneLine: true) }
+        else if effective.provider == .amazon { chunks = try TextChunker.splitUTF8(text, limit: 10_000) }
+        else { chunks = TextChunker.split(text) }
         var completed = ""
         for chunk in chunks {
             try Task.checkCancellation()
             if chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { completed += chunk; continue }
             let prefix = completed
             let result: String
-            if configuration.provider == .deepL {
-                result = try await deepL(chunk, configuration: configuration)
+            if effective.provider == .deepL {
+                result = try await deepL(chunk, configuration: effective)
+            } else if effective.provider.isSpecialized {
+                result = try await specialized(chunk, configuration: effective)
+            } else if effective.provider == .sambaNova {
+                result = try await complete(chunk, configuration: effective)
             } else {
-                result = try await stream(chunk, configuration: configuration) { partial in
+                result = try await stream(chunk, configuration: effective) { partial in
                     await onUpdate(prefix + TextChunker.restoringWhitespace(partial, from: chunk))
                 }
             }
@@ -51,7 +67,7 @@ final class TranslationClient: Translating, @unchecked Sendable {
     static func chatBody(_ text: String, configuration c: TranslationConfiguration) -> [String: Any] {
         let source = c.source == Languages.auto ? "Automatically identify the source language(s)." : "Source language: \(Languages.englishName(c.source))."
         var body: [String: Any] = [
-            "model": c.model, "stream": true, "max_tokens": 8192,
+            "model": c.model, "stream": true, "max_tokens": c.provider.isNewIntegration ? 4096 : 8192,
             "messages": [
                 ["role": "system", "content": """
                 You are a professional translator. \(source)
@@ -79,9 +95,10 @@ final class TranslationClient: Translating, @unchecked Sendable {
 
     private func stream(_ text: String, configuration c: TranslationConfiguration,
                         onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
-        var request = URLRequest(url: c.provider.baseURL.appendingPathComponent("chat/completions"))
+        try ProviderRequests.validateModel(c)
+        var request = URLRequest(url: try ProviderRequests.chatURL(c.provider, options: c.options))
         request.httpMethod = "POST"
-        request.setValue("Bearer \(c.key)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(try await authorizationKey(provider: c.provider, key: c.key, options: c.options))", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         if c.provider == .openRouter { request.setValue("Simple Translator", forHTTPHeaderField: "X-Title") }
@@ -120,48 +137,47 @@ final class TranslationClient: Translating, @unchecked Sendable {
         return translated
     }
 
-    func models(provider: Provider, key: String) async throws -> [ModelOption] {
-        if provider == .deepL {
-            return [ModelOption(id: "prefer_quality_optimized", name: "Лучшее доступное качество", billing: provider.billingLabel(model: "")),
-                    ModelOption(id: "latency_optimized", name: "Быстрый перевод", billing: provider.billingLabel(model: "")),
-                    ModelOption(id: "quality_optimized", name: "Максимальное качество", billing: provider.billingLabel(model: ""))]
-        }
-        var request = URLRequest(url: provider.baseURL.appendingPathComponent("models"))
-        if provider == .openAI {
-            guard !key.isEmpty else { throw TranslationError.missingKey }
-            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        } else if provider == .gemini {
-            guard !key.isEmpty else { throw TranslationError.missingKey }
-            request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000")!)
-            request.setValue(key, forHTTPHeaderField: "x-goog-api-key")
-        }
+    private func authorizationKey(provider: Provider, key: String, options: ConnectionOptions) async throws -> String {
+        if provider == .gigaChat { return try await gigaChatToken.accessToken(credential: key, scope: options.scope, session: session) }
+        return key
+    }
+
+    private func specialized(_ text: String, configuration: TranslationConfiguration) async throws -> String {
+        let request = try ProviderRequests.specialized(text, configuration: configuration)
         let (data, response) = try await session.data(for: request)
         try Self.validate(response)
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw TranslationError.invalidResponse }
-        if provider == .gemini {
-            return (json["models"] as? [[String: Any]] ?? []).compactMap { model in
-                guard let name = model["name"] as? String,
-                      (model["supportedGenerationMethods"] as? [String])?.contains("generateContent") == true,
-                      !["image", "tts", "robotics", "computer-use"].contains(where: { name.contains($0) }) else { return nil }
-                let id = name.replacingOccurrences(of: "models/", with: "")
-                return ModelOption(id: id, name: model["displayName"] as? String ?? name, billing: provider.billingLabel(model: id))
-            }.sorted { $0.name < $1.name }
-        }
-        if provider == .openAI {
-            return (json["data"] as? [[String: Any]] ?? []).compactMap { model in
-                guard let id = model["id"] as? String, Self.isOpenAIChatModel(id) else { return nil }
-                return ModelOption(id: id, name: id, billing: provider.billingLabel(model: id))
-            }.sorted { $0.id < $1.id }
-        }
-        return (json["data"] as? [[String: Any]] ?? []).compactMap { model in
-            guard let id = model["id"] as? String, !id.contains(":batch"),
-                  let architecture = model["architecture"] as? [String: Any],
-                  (architecture["output_modalities"] as? [String]) == ["text"] else { return nil }
-            let pricing = model["pricing"] as? [String: String] ?? [:]
-            return ModelOption(id: id, name: model["name"] as? String ?? id,
-                               inputPrice: pricing["prompt"].flatMap(Double.init), outputPrice: pricing["completion"].flatMap(Double.init),
-                               requestPrice: pricing["request"].flatMap(Double.init) ?? 0)
-        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        try Task.checkCancellation()
+        return try ProviderRequests.translatedText(data, provider: configuration.provider)
+    }
+
+    private func complete(_ text: String, configuration c: TranslationConfiguration) async throws -> String {
+        try ProviderRequests.validateModel(c)
+        var request = URLRequest(url: try ProviderRequests.chatURL(c.provider, options: c.options))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(try await authorizationKey(provider: c.provider, key: c.key, options: c.options))", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body = Self.chatBody(text, configuration: c)
+        body["stream"] = false
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response)
+        try Task.checkCancellation()
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choice = (object["choices"] as? [[String: Any]])?.first else { throw TranslationError.invalidResponse }
+        if choice["finish_reason"] as? String == "length" { throw TranslationError.truncated }
+        guard choice["finish_reason"] as? String == "stop" else { throw TranslationError.interrupted }
+        guard let result = (choice["message"] as? [String: Any])?["content"] as? String,
+              !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw TranslationError.emptyResponse }
+        return result
+    }
+
+    func models(provider: Provider, key: String, options: ConnectionOptions = ConnectionOptions()) async throws -> [ModelOption] {
+        if let local = ModelCatalog.localModels(provider) { return local }
+        let authorized = try await authorizationKey(provider: provider, key: key, options: options)
+        let request = try ModelCatalog.request(provider: provider, key: authorized, options: options)
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response)
+        return try ModelCatalog.parse(data, provider: provider)
     }
 
     static func isOpenAIChatModel(_ id: String) -> Bool {

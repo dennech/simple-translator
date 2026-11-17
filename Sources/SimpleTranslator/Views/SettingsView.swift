@@ -3,7 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var preferences: Preferences
     @State private var key = ""
-    @State private var hasKey = false
+    @State private var keyState: SavedKeyState = .unavailable
     @State private var model = ""
     @State private var message: String?
     @State private var models: [ModelOption] = []
@@ -11,7 +11,19 @@ struct SettingsView: View {
     @State private var isLoading = false
     @State private var isChecking = false
     @State private var showFreeOptions = false
+    @State private var options = ConnectionOptions()
+    @State private var awsSecret = ""
+    @State private var awsSessionToken = ""
     @AppStorage("fontSize") private var fontSize = 17.0
+    private var hasKey: Bool { keyState == .stored }
+    private var keyStatus: String {
+        if preferences.provider == .myMemory && keyState == .missing { return "Можно использовать без ключа и email" }
+        return switch keyState {
+        case .stored: "В Связке ключей этого Mac"
+        case .missing: "Ключ ещё не добавлен"
+        case .unavailable: "Доступ к ключу проверяется при переводе"
+        }
+    }
 
     var body: some View {
         Form {
@@ -20,21 +32,54 @@ struct SettingsView: View {
                     ForEach(Provider.allCases) { provider in Text(provider.title).tag(provider) }
                 }
                 HStack {
-                    SecureField(hasKey ? "Ключ сохранён · введите новый для замены" : "API-ключ", text: $key)
+                    SecureField(hasKey ? "Сохранён · введите для замены" : preferences.provider.credentialLabel, text: $key)
                         .textContentType(.password)
                     Button("Сохранить") { saveKey() }.disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                if preferences.provider == .amazon {
+                    SecureField("Secret Access Key", text: $awsSecret).textContentType(.password)
+                    SecureField("Session Token (только временные ключи)", text: $awsSessionToken).textContentType(.password)
+                }
                 HStack {
-                    Label(hasKey ? "В Связке ключей этого Mac" : "Ключ ещё не добавлен", systemImage: hasKey ? "lock.fill" : "key")
+                    Label(keyStatus, systemImage: hasKey ? "lock.fill" : "key")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    if hasKey {
+                    if keyState != .missing {
                         Button("Удалить ключ", role: .destructive) {
-                            do { try Keychain.delete(preferences.provider); hasKey = false; preferences.revision += 1; message = nil }
+                            do { try Keychain.delete(preferences.provider); keyState = .missing; preferences.revision += 1; message = nil }
                             catch { message = TranslationError.message(for: error) }
                         }.font(.caption)
                     }
-                    Link("Получить ключ", destination: preferences.provider.keyURL).font(.caption)
+                    Link(preferences.provider.requiresKey ? "Получить ключ" : "Условия доступа", destination: preferences.provider.keyURL).font(.caption)
+                }
+                if let note = preferences.provider.setupNote { Text(note).font(.caption).foregroundStyle(.secondary) }
+                if preferences.provider.isNewIntegration {
+                    Label(preferences.provider.requiresKey ? "Новое подключение · проверьте своим ключом" : "Новое подключение · проверьте доступность", systemImage: "network")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if preferences.provider == .gigaChat {
+                    Link("Официальная инструкция по сертификатам", destination: URL(string: "https://developers.sber.ru/docs/ru/gigachat/certificates")!).font(.caption)
+                }
+            }
+            if [.azure, .amazon, .cloudflare, .gigaChat].contains(preferences.provider) {
+                Section("Параметры подключения") {
+                    if preferences.provider == .cloudflare { TextField("Account ID", text: $options.accountID) }
+                    if preferences.provider == .azure { TextField("Регион Azure (если требуется)", text: $options.region) }
+                    if preferences.provider == .amazon {
+                        Picker("Регион AWS", selection: $options.region) {
+                            Text("Выберите регион").tag("")
+                            ForEach(AWSSigner.regions.sorted(), id: \.self) { Text($0).tag($0) }
+                        }
+                    }
+                    if preferences.provider == .gigaChat {
+                        Picker("Тип аккаунта", selection: $options.scope) {
+                            Text("Личный").tag("GIGACHAT_API_PERS")
+                            Text("Бизнес").tag("GIGACHAT_API_B2B")
+                            Text("Корпоративный").tag("GIGACHAT_API_CORP")
+                        }
+                    }
+                    Button("Применить параметры") { preferences.connectionOptions = options }
+                        .disabled(options == preferences.connectionOptions)
                 }
             }
             Section("Основная модель") {
@@ -46,7 +91,7 @@ struct SettingsView: View {
                     Button("Выбрать из списка…") { loadModels() }.disabled(isLoading)
                     if isLoading { ProgressView().controlSize(.small) }
                     Spacer()
-                    Button(isChecking ? "Проверка…" : "Проверить перевод") { check() }.disabled(!hasKey || isChecking)
+                    Button(isChecking ? "Проверка…" : "Проверить перевод") { check() }.disabled((preferences.provider.requiresKey && keyState == .missing) || isChecking)
                 }
                 HStack(alignment: .top) {
                     let selected = models.first(where: { $0.id == preferences.model })
@@ -73,18 +118,18 @@ struct SettingsView: View {
                 Text(preferences.provider.privacyNote).font(.caption).foregroundStyle(.secondary)
                 Text("История не сохраняется. Ключ не попадает в файлы приложения, GitHub или iCloud. Перевод начинается после паузы во вводе; каждый новый запрос учитывается сервисом.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("macOS может запросить доступ к ключу при первом запуске или обновлении. После разрешения ключ используется из памяти до закрытия приложения.")
+                Text("Просмотр настроек не запрашивает ключ. macOS может попросить доступ при первом переводе, проверке подключения или загрузке закрытого списка моделей. После разрешения ключ используется из памяти до закрытия приложения.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 590, height: 595)
+        .frame(width: 620, height: 660)
         .onAppear { reload() }
-        .onDisappear { key = "" }
+        .onDisappear { key = ""; awsSecret = ""; awsSessionToken = "" }
         .onChange(of: preferences.provider) { _, _ in reload() }
-        .sheet(isPresented: $showFreeOptions) { FreeOptionsView() }
+        .sheet(isPresented: $showFreeOptions) { FreeOptionsView { preferences.provider = $0 } }
         .sheet(isPresented: $showModels) {
-            ModelPicker(models: models, current: preferences.model, supportsPrices: preferences.provider == .openRouter) { selected in
+            ModelPicker(models: models, current: preferences.model, supportsPrices: [.openRouter, .huggingFace, .sambaNova].contains(preferences.provider)) { selected in
                 model = selected.id
                 saveModel()
             }
@@ -92,18 +137,29 @@ struct SettingsView: View {
     }
     private func reload() {
         key = ""
+        awsSecret = ""
+        awsSessionToken = ""
+        options = preferences.connectionOptions
         model = preferences.model
         models = []
         message = nil
-        do { hasKey = try Keychain.read(preferences.provider) != nil }
-        catch { hasKey = false; message = TranslationError.message(for: error) }
-        if hasKey || preferences.provider == .openRouter || preferences.provider == .deepL { loadModels(present: false) }
+        keyState = Keychain.savedState(preferences.provider)
+        if !preferences.provider.modelListRequiresKey { loadModels(present: false) }
     }
     private func saveKey() {
         do {
-            try Keychain.save(key, for: preferences.provider)
+            let value: String
+            if preferences.provider == .amazon {
+                guard !awsSecret.isEmpty else { throw TranslationError.missingParameters }
+                value = try AWSCredentials(accessKey: key.trimmingCharacters(in: .whitespacesAndNewlines),
+                                           secretKey: awsSecret.trimmingCharacters(in: .whitespacesAndNewlines),
+                                           sessionToken: awsSessionToken.trimmingCharacters(in: .whitespacesAndNewlines)).encoded()
+            } else { value = key }
+            try Keychain.save(value, for: preferences.provider)
             key = ""
-            hasKey = true
+            awsSecret = ""
+            awsSessionToken = ""
+            keyState = .stored
             preferences.revision += 1
             message = "Ключ сохранён."
         } catch { message = TranslationError.message(for: error) }
@@ -111,18 +167,21 @@ struct SettingsView: View {
     private func saveModel() {
         let value = model.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        preferences.model = value
+        if preferences.model != value { preferences.model = value }
         model = value
         message = nil
     }
     private func loadModels(present: Bool = true) {
+        if present && options != preferences.connectionOptions { preferences.connectionOptions = options }
         let provider = preferences.provider
+        let connection = preferences.connectionOptions
         isLoading = true
         message = nil
         Task {
             defer { isLoading = false }
             do {
-                let found = try await TranslationClient.shared.models(provider: provider, key: Keychain.read(provider) ?? "")
+                let apiKey = provider.modelListRequiresKey ? try Keychain.read(provider) ?? "" : ""
+                let found = try await TranslationClient.shared.models(provider: provider, key: apiKey, options: connection)
                 guard preferences.provider == provider else { return }
                 models = found
                 showModels = present
@@ -130,6 +189,7 @@ struct SettingsView: View {
         }
     }
     private func check() {
+        if options != preferences.connectionOptions { preferences.connectionOptions = options }
         saveModel()
         let provider = preferences.provider
         isChecking = true

@@ -37,6 +37,20 @@ import Observation
         self.configuration = configuration
     }
 
+    /// An entirely offline preview: neither the client nor configuration accesses credentials.
+    static func demonstration() -> TranslatorStore {
+        let store = TranslatorStore(client: DemonstrationTranslator()) { _, source, target in
+            TranslationConfiguration(provider: .deepL, model: "demo", key: "", source: source, target: target)
+        }
+        store.sourceLanguage = "en"
+        store.targetLanguage = "ru"
+        store.detectedLanguage = "en"
+        store.sourceText = "Small details make a big difference.\n\nA quiet place to put your thoughts into words — in any language.\n\nWrite. Translate. Keep going."
+        store.translatedText = DemonstrationTranslator.translation
+        store.isComplete = true
+        return store
+    }
+
     func schedule(preferences: Preferences, immediately: Bool = false) {
         task?.cancel()
         requestID = UUID()
@@ -130,5 +144,15 @@ import Observation
         cache.removeAll()
         cacheOrder.removeAll()
         lastCompleted = nil
+    }
+}
+
+private struct DemonstrationTranslator: Translating {
+    static let translation = "Маленькие детали многое меняют.\n\nСпокойное место, где мысли обретают слова — на любом языке.\n\nПишите. Переводите. Продолжайте."
+    func translate(_ text: String, configuration: TranslationConfiguration,
+                   onUpdate: @escaping @Sendable (String) async -> Void) async throws -> String {
+        try await Task.sleep(for: .seconds(3))
+        try Task.checkCancellation()
+        return Self.translation
     }
 }

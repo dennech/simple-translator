@@ -1,10 +1,13 @@
 import Foundation
 
 enum TranslationError: LocalizedError, Equatable {
-    case missingKey, invalidResponse, emptyResponse, interrupted, truncated, filtered, server(Int)
+    case missingKey, missingModel, missingParameters, unsupportedLanguage, invalidResponse, emptyResponse, interrupted, truncated, filtered, server(Int)
     var errorDescription: String? {
         switch self {
         case .missingKey: "Добавьте API-ключ в настройках (⌘,)."
+        case .missingModel: "Выберите модель в настройках или введите её идентификатор."
+        case .missingParameters: "Проверьте параметры подключения в настройках выбранного сервиса."
+        case .unsupportedLanguage: "Не удалось определить язык для этого API. Выберите язык оригинала вручную."
         case .invalidResponse: "Сервис вернул непонятный ответ. Попробуйте другую модель."
         case .emptyResponse: "Модель не вернула перевод. Попробуйте другую модель."
         case .interrupted: "Соединение прервалось. Перевод не завершён — повторите попытку."
@@ -27,6 +30,9 @@ enum TranslationError: LocalizedError, Equatable {
         if let known = error as? TranslationError { return known.localizedDescription }
         if let known = error as? KeychainError { return known.localizedDescription }
         if let network = error as? URLError {
+            if [.serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot, .secureConnectionFailed].contains(network.code) {
+                return "macOS не смогла проверить защищённое соединение. Для GigaChat проверьте официальную инструкцию по сертификатам в настройках."
+            }
             return network.code == .timedOut ? "Сервис не ответил вовремя. Повторите попытку." : "Нет связи с сервисом. Проверьте интернет и VPN."
         }
         // Never expose a remote response body, request URL, API key or original text in errors.

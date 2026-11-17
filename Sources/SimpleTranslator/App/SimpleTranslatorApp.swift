@@ -8,6 +8,9 @@ struct SimpleTranslatorApp: App {
     @State private var store = TranslatorStore()
 
     init() {
+        if CommandLine.arguments.contains("--demo") {
+            _store = State(initialValue: TranslatorStore.demonstration())
+        }
         if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--check-provider",
            let provider = Provider(rawValue: CommandLine.arguments[2]) {
             Task.detached { exit(await ConnectionCheck.run(provider: provider)) }
@@ -41,6 +44,14 @@ struct SimpleTranslatorApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        if let existing = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }) {
+            existing.activate(options: [])
+            NSApp.terminate(nil)
+        }
+    }
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)

@@ -32,6 +32,13 @@ import Foundation
     #expect(parser.text == "Привет 🌏")
 }
 
+@Test func contentPartsContainOnlyTranslationText() throws {
+    var parser = StreamParser()
+    try parser.consume(#"data: {"choices":[{"delta":{"content":[{"type":"thinking","text":"internal reasoning"},{"type":"text","text":"Привет"}]},"finish_reason":"stop"}]}"#)
+    try parser.validate()
+    #expect(parser.text == "Привет")
+}
+
 @Test func streamNeverMarksPartialTranslationComplete() throws {
     var parser = StreamParser()
     try parser.consume(#"data: {"choices":[{"delta":{"content":"Partial"}}]}"#)

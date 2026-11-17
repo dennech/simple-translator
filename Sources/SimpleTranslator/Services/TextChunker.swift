@@ -1,6 +1,21 @@
 import Foundation
 
 enum TextChunker {
+    static func splitUTF8(_ text: String, limit: Int, oneLine: Bool = false) throws -> [String] {
+        var chunks: [String] = []
+        var current = ""
+        var bytes = 0
+        for character in text {
+            let size = String(character).utf8.count
+            guard size <= limit else { throw TranslationError.server(413) }
+            if bytes + size > limit { chunks.append(current); current = ""; bytes = 0 }
+            current.append(character)
+            bytes += size
+            if oneLine && character.isNewline { chunks.append(current); current = ""; bytes = 0 }
+        }
+        if !current.isEmpty { chunks.append(current) }
+        return chunks
+    }
     /// Keeps every character, including separators. Splits on paragraph/sentence boundaries when possible.
     static func split(_ text: String, limit: Int = 6_000) -> [String] {
         precondition(limit > 0)

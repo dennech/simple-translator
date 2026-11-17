@@ -1,9 +1,30 @@
 import Foundation
 import Security
+import LocalAuthentication
+
+enum SavedKeyState {
+    case stored, missing, unavailable
+}
 
 enum Keychain {
     private static let service = "app.simpletranslator.mac.apikey"
     private static let session = SessionKeyCache()
+
+    /// Metadata only. Settings must never unlock or read the credential just to show its status.
+    static func savedState(_ provider: Provider,
+                           lookup: ([String: Any]) -> OSStatus = { SecItemCopyMatching($0 as CFDictionary, nil) }) -> SavedKeyState {
+        var query = baseQuery(provider)
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecReturnAttributes as String] = true
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = context
+        switch lookup(query) {
+        case errSecSuccess: return .stored
+        case errSecItemNotFound: return .missing
+        default: return .unavailable
+        }
+    }
 
     static func read(_ provider: Provider) throws -> String? {
         try session.read(provider) { try readStored(provider) }
@@ -36,10 +57,12 @@ enum Keychain {
             guard status == errSecSuccess else { throw KeychainError(status: status) }
         } else if update != errSecSuccess { throw KeychainError(status: update) }
         session.set(value, for: provider)
+        TranslationClient.shared.invalidateCredential(for: provider)
     }
 
     static func delete(_ provider: Provider) throws {
         session.set(nil, for: provider)
+        TranslationClient.shared.invalidateCredential(for: provider)
         let status = SecItemDelete(baseQuery(provider) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw KeychainError(status: status) }
     }

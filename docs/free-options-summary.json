@@ -6,7 +6,8 @@
     "summary": "Уже подключён. Нужны аккаунт и ключ; модели :free работают без покупки кредитов.",
     "limit": "20 запросов/мин и 50/сутки. 1000/сутки — только после покупки кредитов на $10.",
     "caution": "Каталог меняется. Текст получает и поставщик модели; ограничения конфиденциальности могут исключить бесплатный маршрут.",
-    "url": "https://openrouter.ai/collections/free-models"
+    "url": "https://openrouter.ai/collections/free-models",
+    "provider": "openRouter"
   },
   {
     "id": "gemini-free",
@@ -15,7 +16,8 @@
     "summary": "Уже подключён. Бесплатный вход и выход есть только у отдельных моделей и на соответствующем уровне аккаунта.",
     "limit": "Пределы запросов и токенов зависят от модели и проекта; смотрите AI Studio.",
     "caution": "Россия не указана в списке доступных стран. На бесплатном уровне данные могут использоваться для улучшения продуктов Google.",
-    "url": "https://ai.google.dev/gemini-api/docs/pricing"
+    "url": "https://ai.google.dev/gemini-api/docs/pricing",
+    "provider": "gemini"
   },
   {
     "id": "deepl-api",
@@ -24,7 +26,8 @@
     "summary": "Уже подключён. Новый Developer оформляется без карты, но его объём не возобновляется.",
     "limit": "Developer: 1 млн знаков всего. Прежний API Free: 500 тыс./месяц, но новое оформление закрыто.",
     "caution": "Подписка на приложение DeepL не заменяет API. Проверьте страну и правила данных своего плана.",
-    "url": "https://support.deepl.com/hc/en-us/articles/360021200939-DeepL-API-plans"
+    "url": "https://support.deepl.com/hc/en-us/articles/360021200939-DeepL-API-plans",
+    "provider": "deepL"
   },
   {
     "id": "openai-api",
@@ -33,133 +36,148 @@
     "summary": "Уже подключён. Общедоступной постоянной бесплатной квоты на перевод нет; API и ChatGPT учитываются отдельно.",
     "limit": "Некоторые платные Pro/Business могут активировать API-кредиты. Это не бесплатный старт для всех; Plus не подходит.",
     "caution": "Само наличие подписки не означает, что кредит выдан. Проверьте предложение, активацию, срок и баланс API-организации; страна тоже влияет.",
-    "url": "https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions"
+    "url": "https://help.openai.com/en/articles/20001626-api-credits-benefit-for-eligible-chatgpt-subscriptions",
+    "provider": "openAI"
   },
   {
     "id": "azure-translator",
     "title": "Azure Translator F0",
-    "availability": "other",
-    "summary": "Регулярная бесплатная квота специализированного перевода; русский и английский поддерживаются. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Регулярная бесплатная квота специализированного перевода; русский и английский поддерживаются. Подключение добавлено; проверьте своим ключом.",
     "limit": "2 млн знаков в месяц на F0.",
     "caution": "Нужны Azure-аккаунт и ресурс Translator; обычная регистрация требует телефон и карту. Для текста заявлена обработка без сохранения.",
-    "url": "https://azure.microsoft.com/en-us/pricing/details/translator/"
+    "url": "https://azure.microsoft.com/en-us/pricing/details/translator/",
+    "provider": "azure"
   },
   {
     "id": "google-cloud-translation",
     "title": "Google Cloud Translation NMT",
-    "availability": "other",
-    "summary": "Регулярная квота стандартного нейронного перевода, включая RU/EN. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Регулярная квота стандартного нейронного перевода, включая RU/EN. Подключение добавлено; проверьте своим ключом.",
     "limit": "500 тыс. знаков в месяц, общие для Basic и Advanced; не относится ко всем моделям и документам.",
     "caution": "Требуется включить оплату; превышение платное. Google заявляет, что тексты этого API не используются для обучения.",
-    "url": "https://cloud.google.com/products/translate/pricing"
+    "url": "https://cloud.google.com/products/translate/pricing",
+    "provider": "googleCloud"
   },
   {
     "id": "mymemory",
     "title": "MyMemory",
-    "availability": "other",
-    "summary": "Вариант коротких фраз без аккаунта и карты. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Вариант коротких фраз без аккаунта и карты. Подключение добавлено; ключ не требуется.",
     "limit": "5000 знаков/сутки анонимно или 50 000 с действительным email; до 500 байт на сегмент.",
     "caution": "Сегменты хранятся долго, возможны внешние поставщики. Не подходит для закрытой переписки; качество нужно проверять.",
-    "url": "https://mymemory.translated.net/doc/usagelimits.php"
+    "url": "https://mymemory.translated.net/doc/usagelimits.php",
+    "provider": "myMemory"
   },
   {
     "id": "groq",
     "title": "Groq: бесплатный API",
-    "availability": "other",
-    "summary": "Есть бесплатный уровень языковых моделей. Нужны аккаунт и ключ; пока не подключён.",
+    "availability": "supported",
+    "summary": "Есть бесплатный уровень языковых моделей. Нужны аккаунт и ключ; Подключение добавлено; проверьте своим ключом.",
     "limit": "Ограничения запросов и токенов зависят от модели; точные значения — в аккаунте.",
     "caution": "Для RU/EN выбирайте мультиязычную модель. Обычно содержание не сохраняется, но есть исключения для отладки и защиты сервиса.",
-    "url": "https://console.groq.com/docs/rate-limits"
+    "url": "https://console.groq.com/docs/rate-limits",
+    "provider": "groq"
   },
   {
     "id": "cloudflare-workers-ai",
     "title": "Cloudflare Workers AI",
-    "availability": "other",
-    "summary": "Ежедневная бесплатная вычислительная квота. Нужны аккаунт и API-токен; пока не подключён.",
+    "availability": "supported",
+    "summary": "Ежедневная бесплатная вычислительная квота. Нужны аккаунт и API-токен; Подключение добавлено; проверьте своим ключом.",
     "limit": "10 000 Neurons/сутки — это единицы вычислений, а не количество запросов.",
     "caution": "Часть моделей доступна только платно. Для обычных запросов заявлены отсутствие обучения и дальнейшего хранения с исключениями.",
-    "url": "https://developers.cloudflare.com/workers-ai/platform/pricing/"
+    "url": "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+    "provider": "cloudflare"
   },
   {
     "id": "cerebras",
     "title": "Cerebras: пробный кредит",
-    "availability": "trial",
-    "summary": "Актуальный тариф предлагает одноразовый пробный кредит. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Актуальный тариф предлагает одноразовый пробный кредит. Подключение добавлено; проверьте своим ключом.",
     "limit": "$5 на 30 дней после добавления действующего способа оплаты.",
     "caution": "Это не постоянная квота. После окончания доступ приостанавливается без отдельной покупки PayGo-кредитов; текст обрабатывается в облаке.",
-    "url": "https://www.cerebras.ai/pricing"
+    "url": "https://www.cerebras.ai/pricing",
+    "provider": "cerebras"
   },
   {
     "id": "fireworks",
     "title": "Fireworks AI: возможный стартовый бонус",
-    "availability": "trial",
-    "summary": "Официальные материалы описывают стартовый кредит, но выдачу новому аккаунту надо подтвердить. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Официальные материалы описывают стартовый кредит, но выдачу новому аккаунту надо подтвердить. Подключение добавлено; проверьте своим ключом.",
     "limit": "В справке указан разовый $1; постоянной бесплатной квоты не подтверждено.",
     "caution": "Текущие тарифы описывают предоплату. Не рассчитывайте на бонус, пока он не отображается в аккаунте; проверьте правила обработки текста.",
-    "url": "https://fireworks.ai/pricing"
+    "url": "https://fireworks.ai/pricing",
+    "provider": "fireworks"
   },
   {
     "id": "nvidia-api-catalog",
     "title": "NVIDIA API Catalog / NIM",
-    "availability": "trial",
-    "summary": "Пробный доступ для тестирования моделей. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Пробный доступ для тестирования моделей. Подключение добавлено; проверьте своим ключом.",
     "limit": "Актуальный объём зависит от предложения и аккаунта; универсальная квота не подтверждена.",
     "caution": "Пробные условия ограничивают рабочее использование API и результатов. Для личной переписки как постоянный бесплатный сервис не предлагается.",
-    "url": "https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf"
+    "url": "https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf",
+    "provider": "nvidia"
   },
   {
     "id": "amazon-translate",
     "title": "Amazon Translate: ограниченный период",
-    "availability": "trial",
-    "summary": "Специализированный облачный переводчик с ограниченным по времени предложением. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Специализированный облачный переводчик с ограниченным по времени предложением. Подключение добавлено; проверьте своим ключом.",
     "limit": "Страница продукта: 2 млн знаков/месяц до 12 месяцев; для нового аккаунта проверьте актуальные условия AWS Free Tier.",
     "caution": "Не постоянная бесплатность. Нужен AWS-аккаунт; возможно использование данных для улучшения сервиса, предусмотрен отказ.",
-    "url": "https://aws.amazon.com/translate/pricing/"
+    "url": "https://aws.amazon.com/translate/pricing/",
+    "provider": "amazon"
   },
   {
     "id": "mistral",
     "title": "Mistral: бесплатный API не подтверждён",
-    "availability": "other",
-    "summary": "Официальные страницы расходятся; текущая документация исключает API из Free. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Официальные страницы расходятся; текущая документация исключает API из Free. Подключение добавлено; проверьте своим ключом.",
     "limit": "Регулярная бесплатная квота для нового API-аккаунта не подтверждена.",
     "caution": "Для ключей документация требует активацию оплаты. Бесплатные Studio/Vibe не означают бесплатный API; правила обучения проверяются отдельно.",
-    "url": "https://docs.mistral.ai/admin/billing-usage/usage-limits"
+    "url": "https://docs.mistral.ai/admin/billing-usage/usage-limits",
+    "provider": "mistral"
   },
   {
     "id": "hugging-face",
     "title": "Hugging Face Inference Providers",
-    "availability": "other",
-    "summary": "Текущий бесплатный аккаунт не получает ежемесячных API-кредитов. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Текущий бесплатный аккаунт не получает ежемесячных API-кредитов. Подключение добавлено; проверьте своим ключом.",
     "limit": "Free Users: нет включённых кредитов; нужны покупка или платный PRO.",
     "caution": "Скачивание модели бесплатно не означает бесплатный облачный запуск. Данные получают выбранные облачные поставщики.",
-    "url": "https://huggingface.co/docs/inference-providers/pricing"
+    "url": "https://huggingface.co/docs/inference-providers/pricing",
+    "provider": "huggingFace"
   },
   {
     "id": "together",
     "title": "Together AI: платный старт",
-    "availability": "other",
-    "summary": "Документация прямо сообщает об отсутствии бесплатных проб. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Документация прямо сообщает об отсутствии бесплатных проб. Подключение добавлено; проверьте своим ключом.",
     "limit": "Для начала обязательна покупка кредитов минимум на $15.",
     "caution": "Не относится к бесплатным вариантам; старые сведения о бонусах устарели. Правила хранения зависят от режима сервиса.",
-    "url": "https://docs.together.ai/docs/billing-credits"
+    "url": "https://docs.together.ai/docs/billing-credits",
+    "provider": "together"
   },
   {
     "id": "sambanova",
     "title": "SambaNova: бесплатная квота не подтверждена",
-    "availability": "other",
-    "summary": "Уровень назван Free, но страница требует оплату для первых запросов. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Уровень назван Free, но страница требует оплату для первых запросов. Подключение добавлено; проверьте своим ключом.",
     "limit": "Указаны добавление способа оплаты и покупка кредитов; регулярный бесплатный объём не подтверждён.",
     "caution": "Название тарифа не означает бесплатное использование. Страну, модель и обработку данных надо проверить отдельно.",
-    "url": "https://cloud.sambanova.ai/plans"
+    "url": "https://cloud.sambanova.ai/plans",
+    "provider": "sambaNova"
   },
   {
     "id": "yandex-translate",
     "title": "Yandex Translate / AI Studio",
-    "availability": "other",
-    "summary": "Специализированный API перевода; постоянная бесплатная квота не заявлена. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Специализированный API перевода; постоянная бесплатная квота не заявлена. Подключение добавлено; проверьте своим ключом.",
     "limit": "Опубликовано 500,4 ₽ за 1 млн знаков с НДС. Доступность стартового гранта не подтверждена.",
     "caution": "Бесплатный сайт не означает бесплатный API. Страницы о грантах расходятся; текст отправляется в облако.",
-    "url": "https://aistudio.yandex.ru/ru/docs/ai-studio/pricing"
+    "url": "https://aistudio.yandex.ru/ru/docs/ai-studio/pricing",
+    "provider": "yandex"
   },
   {
     "id": "apple-translation",
@@ -209,19 +227,21 @@
   {
     "id": "gigachat",
     "title": "GigaChat API: Freemium для физлиц",
-    "availability": "trial",
-    "summary": "Бесплатный режим личного некоммерческого использования. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Бесплатный режим личного некоммерческого использования. Подключение добавлено; проверьте своим ключом.",
     "limit": "Для действующих клиентов описано 365 млн токенов по четырём моделям на 12 месяцев; выдача новым аккаунтам требует проверки.",
     "caution": "Не обещаем ежегодное возобновление. Новые платные подключения перенесены на Cloud.ru; коммерческое применение Freemium ограничено, данные идут в облако.",
-    "url": "https://developers.sber.ru/docs/ru/gigachat/tariffs/individual-tariffs"
+    "url": "https://developers.sber.ru/docs/ru/gigachat/tariffs/individual-tariffs",
+    "provider": "gigaChat"
   },
   {
     "id": "siliconflow",
     "title": "SiliconFlow: стартовый кредит",
-    "availability": "trial",
-    "summary": "Международный сервис предлагает пробный облачный запуск языковых моделей. Пока не подключён.",
+    "availability": "supported",
+    "summary": "Международный сервис предлагает пробный облачный запуск языковых моделей. Подключение добавлено; проверьте своим ключом.",
     "limit": "Официально рекламируется разовый $1; регулярная бесплатная квота не подтверждена.",
     "caution": "Нужны аккаунт и ключ. Карту, страну, правила данных и качество RU/EN выбранной модели нужно проверить отдельно.",
-    "url": "https://www.siliconflow.com/pricing"
+    "url": "https://www.siliconflow.com/pricing",
+    "provider": "siliconFlow"
   }
 ]

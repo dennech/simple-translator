@@ -8,9 +8,11 @@ private struct FreeOption: Decodable, Identifiable {
     let limit: String
     let caution: String
     let url: URL
+    let provider: Provider?
 }
 
 struct FreeOptionsView: View {
+    var selectProvider: (Provider) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     private let options: [FreeOption] = {
@@ -50,6 +52,9 @@ struct FreeOptionsView: View {
                                     HStack {
                                         Text(option.title).font(.headline)
                                         Spacer()
+                                        if let provider = option.provider {
+                                            Button("Подключить") { selectProvider(provider); dismiss() }.controlSize(.small)
+                                        }
                                         Link("Условия ↗", destination: option.url).font(.caption)
                                     }
                                     Text(option.summary).font(.callout)
