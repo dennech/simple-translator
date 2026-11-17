@@ -1,0 +1,15 @@
+.build/
+dist/
+.swiftpm/
+.DS_Store
+.env
+.env.*
+*.key
+*.p12
+*.pem
+*.log
+tmp/
+AGENTS.md
+.codex/
+.agents/
+*.dSYM/

@@ -1,0 +1,134 @@
+import SwiftUI
+import Observation
+
+@MainActor @Observable final class TranslatorStore {
+    var sourceText = ""
+    private(set) var translatedText = ""
+    var sourceLanguage = Languages.auto
+    var targetLanguage = Languages.auto
+    private(set) var detectedLanguage: String?
+    private(set) var isTranslating = false
+    private(set) var isComplete = false
+    private(set) var error: String?
+    var resolvedSource: String? { sourceLanguage == Languages.auto ? detectedLanguage : sourceLanguage }
+    var resolvedTarget: String { Languages.target(selected: targetLanguage, source: resolvedSource) }
+    @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var requestID = UUID()
+    @ObservationIgnored private var cache: [CacheKey: String] = [:]
+    @ObservationIgnored private var cacheOrder: [CacheKey] = []
+    @ObservationIgnored private let client: any Translating
+    @ObservationIgnored private let configuration: @MainActor (Preferences, String, String) throws -> TranslationConfiguration
+    @ObservationIgnored private var lastCompleted: TranslationSnapshot?
+
+    struct CacheKey: Hashable {
+        let text: String
+        let provider: Provider
+        let model: String
+        let source: String
+        let target: String
+        let revision: Int
+    }
+
+    init(client: any Translating = TranslationClient.shared,
+         configuration: @escaping @MainActor (Preferences, String, String) throws -> TranslationConfiguration = {
+             try $0.configuration(source: $1, target: $2)
+         }) {
+        self.client = client
+        self.configuration = configuration
+    }
+
+    func schedule(preferences: Preferences, immediately: Bool = false) {
+        task?.cancel()
+        requestID = UUID()
+        let id = requestID
+        isComplete = false
+        error = nil
+        let text = sourceText
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            translatedText = ""
+            lastCompleted = nil
+            isTranslating = false
+            detectedLanguage = nil
+            return
+        }
+        isTranslating = true
+        task = Task { [weak self] in
+            do {
+                if !immediately { try await Task.sleep(for: .milliseconds(450)) }
+                try Task.checkCancellation()
+                guard let self, self.requestID == id else { return }
+                self.detectedLanguage = Languages.detect(text)
+                let target = self.resolvedTarget
+                if self.resolvedSource == target {
+                    self.lastCompleted = nil
+                    self.translatedText = text
+                    self.isTranslating = false
+                    self.isComplete = true
+                    return
+                }
+                let config = try self.configuration(preferences, self.sourceLanguage, target)
+                let revision = preferences.revision
+                let cacheKey = CacheKey(text: text, provider: config.provider, model: config.model,
+                                        source: config.source, target: target, revision: preferences.revision)
+                if let cached = self.cache[cacheKey] {
+                    self.translatedText = cached
+                } else {
+                    let suffix = self.lastCompleted?.appendedText(for: text, configuration: config, revision: revision)
+                    let prefix = suffix == nil ? "" : self.lastCompleted?.translation ?? ""
+                    let showStream = suffix != nil || self.translatedText.isEmpty
+                    let result = try await self.client.translate(suffix ?? text, configuration: config) { [weak self] partial in
+                        if showStream { await self?.receive(prefix + partial, id: id) }
+                    }
+                    try Task.checkCancellation()
+                    guard self.requestID == id else { return }
+                    self.translatedText = prefix + result
+                    if text.count + self.translatedText.count <= 100_000 {
+                        self.cache[cacheKey] = self.translatedText
+                        self.cacheOrder.append(cacheKey)
+                        while self.cacheOrder.count > 8 { self.cache.removeValue(forKey: self.cacheOrder.removeFirst()) }
+                    }
+                }
+                self.lastCompleted = TranslationSnapshot(source: text, translation: self.translatedText,
+                    provider: config.provider, model: config.model, sourceLanguage: config.source,
+                    targetLanguage: config.target, revision: revision)
+                self.isTranslating = false
+                self.isComplete = true
+            } catch is CancellationError { /* A newer request owns the UI. */ }
+            catch {
+                guard let self, self.requestID == id else { return }
+                self.isTranslating = false
+                self.error = TranslationError.message(for: error)
+            }
+        }
+    }
+
+    private func receive(_ partial: String, id: UUID) {
+        guard requestID == id else { return }
+        translatedText = partial
+    }
+
+    func swap() {
+        let oldSource = resolvedSource ?? "en"
+        let oldTarget = resolvedTarget
+        let oldTranslation = translatedText
+        task?.cancel()
+        requestID = UUID()
+        sourceLanguage = oldTarget
+        targetLanguage = oldSource
+        if isComplete { sourceText = oldTranslation }
+    }
+
+    func clear() {
+        task?.cancel()
+        requestID = UUID()
+        sourceText = ""
+        translatedText = ""
+        detectedLanguage = nil
+        error = nil
+        isTranslating = false
+        isComplete = false
+        cache.removeAll()
+        cacheOrder.removeAll()
+        lastCompleted = nil
+    }
+}
