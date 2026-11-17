@@ -52,7 +52,7 @@ enum Keychain {
             var item = query.merging(attributes) { _, new in new }
             item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             item[kSecAttrSynchronizable as String] = false
-            item[kSecAttrLabel as String] = "Простой переводчик · \(provider.title)"
+            item[kSecAttrLabel as String] = "Simple Translator · \(provider.title)"
             let status = SecItemAdd(item as CFDictionary, nil)
             guard status == errSecSuccess else { throw KeychainError(status: status) }
         } else if update != errSecSuccess { throw KeychainError(status: update) }

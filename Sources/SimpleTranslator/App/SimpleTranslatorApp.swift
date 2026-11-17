@@ -30,7 +30,7 @@ struct SimpleTranslatorApp: App {
     }
 
     var body: some Scene {
-        Window("Простой переводчик", id: "translator") {
+        Window("Simple Translator", id: "translator") {
             ContentView(store: store, preferences: preferences)
         }
         .defaultSize(width: 940, height: 540)
@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { sender.windows.first(where: { $0.identifier?.rawValue == "translator" || $0.title == "Простой переводчик" })?.makeKeyAndOrderFront(nil) }
+        if !flag { sender.windows.first(where: { $0.identifier?.rawValue == "translator" || $0.title == "Simple Translator" })?.makeKeyAndOrderFront(nil) }
         return true
     }
 }

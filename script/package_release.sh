@@ -3,7 +3,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 ./script/build_and_run.sh --universal
-APP_BUNDLE="dist/Простой переводчик.app"
+APP_BUNDLE="dist/Simple Translator.app"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)"
 ARCHIVE="Simple-Translator-$VERSION-macOS-universal.zip"
 mkdir -p dist/releases

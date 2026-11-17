@@ -3,7 +3,7 @@ set -euo pipefail
 MODE="${1:-run}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
-APP_BUNDLE="$PROJECT_ROOT/dist/Простой переводчик.app"
+APP_BUNDLE="$PROJECT_ROOT/dist/Simple Translator.app"
 case "$MODE" in run|--verify|--debug|--logs|--telemetry|--build-only|--universal) ;; *) echo "Usage: $0 [--build-only|--universal|--verify|--debug|--logs|--telemetry]" >&2; exit 2 ;; esac
 build_arch() {
     local arch="$1"
