@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 
+private let translatorWindowID = "translator"
+
 @main
 struct SimpleTranslatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -30,7 +32,7 @@ struct SimpleTranslatorApp: App {
     }
 
     var body: some Scene {
-        Window("Simple Translator", id: "translator") {
+        Window("Simple Translator", id: translatorWindowID) {
             ContentView(store: store, preferences: preferences)
         }
         .defaultSize(width: 940, height: 540)
@@ -53,12 +55,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NotificationCenter.default.addObserver(self, selector: #selector(windowWillClose(_:)),
+                                               name: NSWindow.willCloseNotification, object: nil)
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window.identifier?.rawValue == translatorWindowID else { return }
+        DispatchQueue.main.async { NSApp.terminate(nil) }
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { sender.windows.first(where: { $0.identifier?.rawValue == "translator" || $0.title == "Simple Translator" })?.makeKeyAndOrderFront(nil) }
+        if !flag { sender.windows.first(where: { $0.identifier?.rawValue == translatorWindowID || $0.title == "Simple Translator" })?.makeKeyAndOrderFront(nil) }
         return true
     }
 }

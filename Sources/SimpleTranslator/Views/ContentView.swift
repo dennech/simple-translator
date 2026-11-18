@@ -40,10 +40,10 @@ struct ContentView: View {
                         .disabled(!store.isComplete)
                 }.frame(maxWidth: .infinity)
             }.padding(.horizontal, 30).frame(height: 52)
-            HSplitView {
-                pane(text: $store.sourceText, placeholder: "Текст", editable: true)
-                pane(text: .constant(store.translatedText), placeholder: "Перевод", editable: false)
-            }.padding(.horizontal, 12).padding(.bottom, 12)
+            TranslationSplitView(
+                original: pane(text: $store.sourceText, placeholder: "Текст", editable: true),
+                translation: pane(text: .constant(store.translatedText), placeholder: "Перевод", editable: false)
+            ).padding(.horizontal, 12).padding(.bottom, 12)
             if let error = store.error {
                 Divider()
                 HStack(spacing: 10) {
@@ -57,8 +57,10 @@ struct ContentView: View {
         }
         .background {
             LinearGradient(colors: [Color(nsColor: .windowBackgroundColor), Color.blue.opacity(colorScheme == .dark ? 0.06 : 0.035)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .ignoresSafeArea(.container, edges: .top)
         }
         .frame(minWidth: 620, minHeight: 300)
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 SettingsLink { Image(systemName: "gearshape").font(.system(size: 12)) }.help("Настройки (⌘,)")
