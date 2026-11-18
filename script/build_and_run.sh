@@ -30,6 +30,9 @@ else
     cp "$(build_dir "$HOST_ARCH")/SimpleTranslator" "$APP_BUNDLE/Contents/MacOS/SimpleTranslator"
 fi
 xcrun strip -S "$APP_BUNDLE/Contents/MacOS/SimpleTranslator"
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+ditto "$(build_dir "$HOST_ARCH")/Sparkle.framework" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+cp Resources/Sparkle-LICENSE.txt "$APP_BUNDLE/Contents/Resources/"
 cp Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
 cp docs/free-options-summary.json "$APP_BUNDLE/Contents/Resources/FreeOptions.json"
 if [[ ! -f Resources/AppIcon.icns || script/generate_icon.swift -nt Resources/AppIcon.icns ]]; then
@@ -39,7 +42,9 @@ if [[ ! -f Resources/AppIcon.icns || script/generate_icon.swift -nt Resources/Ap
     cp .build/AppIcon.iconset/icon_512x512@2x.png Resources/AppIcon.png
 fi
 cp Resources/AppIcon.icns "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-codesign --force --sign - --options runtime --entitlements Resources/Entitlements.plist "$APP_BUNDLE"
+codesign --validate-constraint Resources/SparkleLibraryConstraint.plist
+codesign --force --sign - --options runtime --entitlements Resources/Entitlements.plist \
+    --library-constraint Resources/SparkleLibraryConstraint.plist "$APP_BUNDLE"
 codesign --verify --strict "$APP_BUNDLE"
 case "$MODE" in
     --build-only|--universal) echo "$APP_BUNDLE" ;;

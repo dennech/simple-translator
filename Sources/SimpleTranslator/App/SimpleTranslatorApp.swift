@@ -10,6 +10,10 @@ struct SimpleTranslatorApp: App {
     @State private var store = TranslatorStore()
 
     init() {
+        if Array(CommandLine.arguments.dropFirst()) == ["--version"] {
+            print(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+            exit(0)
+        }
         if CommandLine.arguments.contains("--demo") {
             _store = State(initialValue: TranslatorStore.demonstration())
         }

@@ -27,6 +27,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            UpdateSettingsRow()
             Section {
                 Picker("Основной сервис", selection: $preferences.provider) {
                     ForEach(Provider.allCases) { provider in Text(provider.title).tag(provider) }

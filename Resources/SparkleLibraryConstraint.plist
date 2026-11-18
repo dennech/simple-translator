@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <!-- Code-directory hashes of the pinned arm64 and x86_64 Sparkle images. -->
+    <key>cdhash</key><dict><key>$in</key><array>
+        <data>UZ2SEZ68zg8Ox1KdIRiLa0oRoww=</data>
+        <data>YVeicQp6v0Skchu7R9uuirzJd48=</data>
+    </array></dict>
+</dict></plist>
