@@ -201,3 +201,35 @@ private actor ControlledTranslator: Translating {
     #expect(view.isFlipped)
     #expect(view.word(at: NSPoint(x: rect.maxX + 80, y: rect.midY), language: "en") == nil)
 }
+
+@MainActor @Test func wordSuggestionsForClicksInACommaSeparatedList() throws {
+    let view = TranslationTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 120))
+    view.string = "Check, one, two, three"
+    let layout = try #require(view.layoutManager)
+    let container = try #require(view.textContainer)
+    layout.ensureLayout(for: container)
+
+    for token in ["one", "two", "three"] {
+        let range = (view.string as NSString).range(of: token)
+        let glyph = layout.glyphIndexForCharacter(at: range.location)
+        let rect = layout.boundingRect(forGlyphRange: NSRange(location: glyph, length: 1), in: container)
+        let point = NSPoint(x: rect.midX + view.textContainerOrigin.x, y: rect.midY + view.textContainerOrigin.y)
+        let hit = try #require(view.word(at: point, language: "en"))
+        let payload = try JSONDecoder().decode([String: String].self, from: Data(hit.word.payload().utf8))
+        #expect(payload["word"] == token)
+        #expect(payload["articleBefore"] == nil)
+        let edits = try hit.word.suggestions(from: #"[{"left":"","right":"","replacement":"next"}]"#)
+        #expect(edits.first?.range == range)
+    }
+}
+
+@Test(arguments: [
+    ("", nil), ("   ", nil), ("line\n", nil), ("… ", nil), ("4\t", nil),
+    ("🎙️  ", nil), ("an, ", nil), ("theatre ", nil), ("A ", "A "),
+    ("after an\u{00a0}", "an\u{00a0}"), ("(THE  ", "THE  ")
+] as [(String, String?)])
+func englishArticleContextBeforeClickedWord(prefix: String, article: String?) throws {
+    let word = try #require(TranslationWord(text: prefix + "example", characterOffset: prefix.utf16.count, language: "en"))
+    let payload = try JSONDecoder().decode([String: String].self, from: Data(word.payload().utf8))
+    #expect(payload["articleBefore"] == article)
+}

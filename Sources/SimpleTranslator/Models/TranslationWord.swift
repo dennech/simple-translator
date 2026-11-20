@@ -37,8 +37,9 @@ struct TranslationWord: Equatable, Sendable {
     private var precedingEnglishArticle: String? {
         guard language == "en", before.last?.isWhitespace == true,
               let end = before.lastIndex(where: { !$0.isWhitespace }) else { return nil }
-        let start = before[..<before.index(after: end)].lastIndex(where: { !$0.isLetter }).map { before.index(after: $0) } ?? before.startIndex
-        guard ["a", "an", "the"].contains(before[start...end].lowercased()) else { return nil }
+        let prefix = before[...end]
+        let start = prefix.lastIndex(where: { !$0.isLetter }).map { prefix.index(after: $0) } ?? prefix.startIndex
+        guard ["a", "an", "the"].contains(prefix[start...].lowercased()) else { return nil }
         return String(before[start...])
     }
 
