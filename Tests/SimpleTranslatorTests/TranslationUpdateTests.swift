@@ -183,6 +183,41 @@ private actor ControlledTranslator: Translating {
     #expect((text as NSString).replacingCharacters(in: choice.range, with: choice.replacement) == "I saw a flat.")
 }
 
+@Test func repeatedListContextIsKeptOutsideWordReplacements() throws {
+    let text = "Check, one, two, suitcase, please."
+    let range = (text as NSString).range(of: "suitcase")
+    let word = try #require(TranslationWord(text: text, characterOffset: range.location, language: "en"))
+    let response = #"""
+    [
+        {"left":"two, ","right":"","replacement":"two, bag"},
+        {"left":"","right":", please.","replacement":"travel case, please."},
+        {"left":"one, two, ","right":", please.","replacement":"one, two, travel bag, please."},
+        {"left":"two, ","right":"","replacement":"two, BAG"},
+        {"left":"other, ","right":"","replacement":"other, kit"},
+        {"left":"two, ","right":"","replacement":"case"}
+    ]
+    """#
+    let edits = try word.suggestions(from: response)
+    #expect(edits.map(\.replacement) == ["bag", "travel case", "travel bag"])
+    #expect(edits.allSatisfy { $0.range == range })
+    let first = try #require(edits.first)
+    #expect((text as NSString).replacingCharacters(in: first.range, with: first.replacement) == "Check, one, two, bag, please.")
+    #expect(try word.suggestions(from: "[]").isEmpty)
+    #expect(throws: WordSuggestionsError.unusableEdits) {
+        try word.suggestions(from: #"[{"left":"two, ","right":"","replacement":"one, case"}]"#)
+    }
+}
+
+@Test func repeatedContextKeepsTheArticleAndAgreementInsideTheEdit() throws {
+    let text = "📍 Here, an apartment."
+    let word = try #require(TranslationWord(text: text, characterOffset: (text as NSString).range(of: "apartment").location, language: "en"))
+    let edits = try word.suggestions(from: #"[{"left":"📍 Here, an ","right":".","replacement":"📍 Here, a flat."}]"#)
+    let edit = try #require(edits.first)
+    #expect(edit.original == "an apartment")
+    #expect(edit.replacement == "a flat")
+    #expect((text as NSString).replacingCharacters(in: edit.range, with: edit.replacement) == "📍 Here, a flat.")
+}
+
 @MainActor @Test func textViewAnchorsSuggestionsToTheClickedOccurrence() throws {
     let view = TranslationTextView(frame: NSRect(x: 0, y: 0, width: 340, height: 140))
     view.font = NSFont.systemFont(ofSize: 17)

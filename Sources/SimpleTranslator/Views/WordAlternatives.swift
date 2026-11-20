@@ -105,7 +105,8 @@ private struct AlternativesList: View {
                     }
                 }.controlSize(.small).padding(4)
             } else if choices.isEmpty {
-                Text("Подходящих замен нет").font(.callout).foregroundStyle(.secondary).padding(8)
+                Text("Модель не предложила замен").font(.callout).foregroundStyle(.secondary).padding(8)
+                Button("Повторить") { attempt += 1 }.buttonStyle(.link).font(.caption).padding(6)
             } else {
                 ForEach(choices, id: \.replacement) { item in
                     Button { choose(item) } label: {
@@ -140,10 +141,13 @@ private struct AlternativesList: View {
                 choices = result
             } catch {
                 guard !Task.isCancelled else { return }
-                if error is WordSuggestionsError {
+                switch error {
+                case WordSuggestionsError.needsProvider:
                     message = "Для этого языка выберите сервис. Он получит слово и фрагмент перевода."
                     needsProvider = true
-                } else {
+                case WordSuggestionsError.unusableEdits:
+                    message = "Варианты модели не удалось применить к выбранному слову."
+                default:
                     message = TranslationError.message(for: error)
                 }
             }
